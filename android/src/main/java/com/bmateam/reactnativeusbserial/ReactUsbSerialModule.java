@@ -1,5 +1,11 @@
+// Original version comes from
+// https://github.com/edvijaka/react-native-usbserial/blob/master/android/src/main/java/com/bmateam/reactnativeusbserial/ReactUsbSerialModule.java
+// It has been customized with code coming from https://github.com/kai-morich/SimpleUsbTerminal
+
 package com.bmateam.reactnativeusbserial;
 
+import android.util.Log;
+import androidx.annotation.NonNull;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -12,26 +18,60 @@ import android.hardware.usb.UsbManager;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
+import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.hoho.android.usbserial.driver.UsbSerialDriver;
+import com.hoho.android.usbserial.driver.CdcAcmSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
+import com.hoho.android.usbserial.util.SerialInputOutputManager;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+import android.util.Base64;
+
+import static android.content.ContentValues.TAG;
 
 public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
 
     private final HashMap<String, UsbSerialDevice> usbSerialDriverDict = new HashMap<>();
 
+    private final ExecutorService mExecutor = Executors.newSingleThreadExecutor();
+
+    private SerialInputOutputManager mSerialIoManager;
+
+    private UsbDeviceConnection mConnection;
+
+    private SerialInputOutputManager.Listener mListener = new SerialInputOutputManager.Listener() {
+        @Override
+        public void onRunError(Exception e) {
+            Log.d(TAG, "Runner stopped.");
+        }
+
+        @Override
+        public void onNewData(final byte[] data) {
+            Log.d(TAG, "received " + data.length + " bytes of data from usb device");
+            if (data.length > 0) {
+                ReactUsbSerialModule.this.emitNewData(data);
+            }
+        }
+    };
+
+    public ReactApplicationContext REACTCONTEXT;
+
     public ReactUsbSerialModule(ReactApplicationContext reactContext) {
         super(reactContext);
+        REACTCONTEXT = reactContext;
     }
 
     @Override
@@ -48,7 +88,7 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
             HashMap<String, UsbDevice> usbDevices = usbManager.getDeviceList();
             WritableArray deviceArray = Arguments.createArray();
 
-            for (String key: usbDevices.keySet()) {
+            for (String key : usbDevices.keySet()) {
                 UsbDevice device = usbDevices.get(key);
                 WritableMap map = Arguments.createMap();
 
@@ -73,14 +113,58 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
         try {
             int prodId = deviceObject.getInt("productId");
             UsbManager manager = getUsbManager();
-            UsbSerialDriver driver = getUsbSerialDriver(prodId, manager);
 
-            if (manager.hasPermission(driver.getDevice())) {
-                WritableMap usd = createUsbSerialDevice(manager, driver);
+            HashMap<String, UsbDevice> usbDevices = manager.getDeviceList();
+            for (String key : usbDevices.keySet()) {
+                UsbDevice device = usbDevices.get(key);
 
-                p.resolve(usd);
-            } else {
-                requestUsbPermission(manager, driver.getDevice(), p);
+                if (device.getProductId() == prodId) {
+                    UsbSerialDriver driver =
+                            // new FtdiSerialDriver(device);
+                            new CdcAcmSerialDriver(device);
+                    // new Cp21xxSerialDriver(device);
+
+                    if (manager.hasPermission(driver.getDevice())) {
+                        WritableMap usd = createUsbSerialDevice(manager, driver);
+
+                        p.resolve(usd);
+                    } else {
+                        requestUsbPermission(manager, driver.getDevice(), p);
+                    }
+
+                    break;
+                }
+            }
+
+        } catch (Exception e) {
+            String stackTrace = Log.getStackTraceString(e);
+            p.reject(stackTrace, e);
+        }
+    }
+
+    @ReactMethod
+    public void closeDeviceAsync(String deviceId, Promise p) {
+
+        try {
+
+            UsbSerialDevice usd = usbSerialDriverDict.get(deviceId);
+
+            if (usd == null) {
+                throw new Exception(String.format("No device opened for the id '%s'", deviceId));
+            }
+            mListener = null;
+
+            if (mSerialIoManager != null) {
+                mSerialIoManager.setListener(null);
+                mSerialIoManager.stop();
+                mSerialIoManager = null;
+            }
+
+            usd.closeAsync(p);
+
+            if (mConnection != null) {
+                mConnection.close();
+                mConnection = null;
             }
 
         } catch (Exception e) {
@@ -89,9 +173,7 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void writeInDeviceAsync(String deviceId,
-                                   String value,
-                                   Promise p) {
+    public void writeInDeviceAsync(String deviceId, String value, Promise p) {
 
         try {
             UsbSerialDevice usd = usbSerialDriverDict.get(deviceId);
@@ -106,16 +188,43 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
         }
     }
 
-    private WritableMap createUsbSerialDevice(UsbManager manager,
-                                              UsbSerialDriver driver) throws IOException {
+    /*
+     * @ReactMethod public void readDeviceAsync(String deviceId) {
+     *
+     * try { UsbSerialDevice usd = usbSerialDriverDict.get(deviceId);
+     *
+     * if (usd == null) { throw new
+     * Exception(String.format("No device opened for the id '%s'", deviceId)); }
+     *
+     * mSerialIoManager = new SerialInputOutputManager(usd.port, mListener);
+     * mExecutor.submit(mSerialIoManager); } catch (Exception e) { } }
+     */
 
-        UsbDeviceConnection connection = manager.openDevice(driver.getDevice());
+    private void sendEvent(ReactContext reactContext, String eventName, @NonNull WritableMap params) {
+        reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, params);
+    }
+
+    public void emitNewData(byte[] data) {
+        if (REACTCONTEXT != null) {
+            WritableMap params = Arguments.createMap();
+            params.putString("data", Base64.encodeToString(data, Base64.DEFAULT));
+            sendEvent(REACTCONTEXT, "newData", params);
+        }
+    }
+
+    private WritableMap createUsbSerialDevice(UsbManager manager, UsbSerialDriver driver) throws IOException {
+
+        mConnection = manager.openDevice(driver.getDevice());
 
         // Most have just one port (port 0).
         UsbSerialPort port = driver.getPorts().get(0);
 
-        port.open(connection);
+        port.open(mConnection);
         port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
+        port.setDTR(true);
+        port.setRTS(true);
+        mSerialIoManager = new SerialInputOutputManager(port, mListener);
+        mExecutor.submit(mSerialIoManager);
 
         String id = generateId();
         UsbSerialDevice usd = new UsbSerialDevice(port);
@@ -129,9 +238,7 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
         return map;
     }
 
-    private void requestUsbPermission(UsbManager manager,
-                                      UsbDevice device,
-                                      Promise p) {
+    private void requestUsbPermission(UsbManager manager, UsbDevice device, Promise p) {
 
         try {
             ReactApplicationContext rAppContext = getReactApplicationContext();
@@ -145,7 +252,7 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
         }
     }
 
-    private static final String ACTION_USB_PERMISSION  = "com.bmateam.reactnativeusbserial.USB_PERMISSION";
+    private static final String ACTION_USB_PERMISSION = "com.bmateam.reactnativeusbserial.USB_PERMISSION";
 
     private UsbManager getUsbManager() {
         ReactApplicationContext rAppContext = getReactApplicationContext();
@@ -200,8 +307,8 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
                             }
 
                         } else {
-                            p.resolve(new Exception(String.format("Permission denied by user for device %s", device
-                                    .getDeviceName())));
+                            p.resolve(new Exception(
+                                    String.format("Permission denied by user for device %s", device.getDeviceName())));
                         }
                     }
                 }
