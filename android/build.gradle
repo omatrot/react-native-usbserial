@@ -1,18 +1,20 @@
 buildscript {
   repositories {
     mavenCentral()
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+    jcenter()
+    google()
   }
 
   dependencies {
-    classpath 'com.android.tools.build:gradle:1.2.3'
+    classpath 'com.android.tools.build:gradle:3.5.0'
   }
 }
 
 allprojects {
   repositories {
     mavenCentral()
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+    jcenter()
+    google()
   }
 }
 
@@ -22,9 +24,16 @@ android {
   compileSdkVersion 23
   buildToolsVersion "23.0.1"
 
+  buildTypes {
+    debug {
+      minifyEnabled false
+      debuggable true
+    }
+  }
+
   defaultConfig {
-    minSdkVersion 16
-    targetSdkVersion 22
+    minSdkVersion 18
+    targetSdkVersion 28
     versionCode 1
     versionName "1.0"
   }
@@ -40,6 +49,6 @@ repositories {
 }
 
 dependencies {
-  compile "com.facebook.react:react-native:0.19.+"
-  compile 'com.hoho.android:usb-serial-for-android:0.2.0-SNAPSHOT@aar'
+  implementation "com.facebook.react:react-native:0.19.+"
+  implementation 'com.github.kai-morich:usb-serial-for-android:1.7.0'
 }
