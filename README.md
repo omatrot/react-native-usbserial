@@ -1,3 +1,9 @@
+This fork is customized for using a USB oxymeter peripheral.
+
+It is using the same version of the package com.github.kai-morich:usb-serial-for-android package as [SimpleUsbTerminal](https://github.com/kai-morich/SimpleUsbTerminal)
+
+You sould subscribe to the data event before opening the device, because received data will be sent immediately.
+
 # react-native-usbserial
 
 This wrapper implementation is totally based on [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android). Thanks [mik3y](https://github.com/mik3y) for the awesome project.
