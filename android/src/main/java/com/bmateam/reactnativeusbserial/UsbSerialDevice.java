@@ -5,6 +5,8 @@ import com.hoho.android.usbserial.driver.UsbSerialPort;
 
 import java.io.IOException;
 
+import java.nio.charset.StandardCharsets;
+
 public class UsbSerialDevice {
     public UsbSerialPort port;
     private static final int SERIAL_TIMEOUT = 1000;
@@ -18,7 +20,9 @@ public class UsbSerialDevice {
         if (port != null) {
 
             try {
-                int written = port.write(value.getBytes(), SERIAL_TIMEOUT);
+                String s = new String(value.getBytes(StandardCharsets.UTF_8));
+                final byte[] stringBytes = s.getBytes(StandardCharsets.ISO_8859_1);
+                int written = port.write(stringBytes, SERIAL_TIMEOUT);
 
                 promise.resolve(written);
             } catch (IOException e) {
