@@ -18,9 +18,9 @@ public class UsbSerialDevice {
         if (port != null) {
 
             try {
-                port.write(value.getBytes(), SERIAL_TIMEOUT);
+                int written = port.write(value.getBytes(), SERIAL_TIMEOUT);
 
-                promise.resolve(null);
+                promise.resolve(written);
             } catch (IOException e) {
                 promise.reject(e);
             }
