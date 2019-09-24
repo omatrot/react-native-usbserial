@@ -6,6 +6,8 @@ You may have to subscribe to the data event before opening the device, because r
 
 The device sends a byte array that is converted to a base64 string to go through the native bridge.
 
+Strings sent to the device are converted to ISO_8859_1
+
 # react-native-usbserial
 
 This wrapper implementation is totally based on [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android). Thanks [mik3y](https://github.com/mik3y) for the awesome project.
