@@ -195,7 +195,8 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
     public void emitNewData(byte[] data) {
         if (REACTCONTEXT != null) {
             WritableMap params = Arguments.createMap();
-            params.putString("data", Base64.encodeToString(data, Base64.DEFAULT));
+            // No line break => Base64.NO_WRAP
+            params.putString("data", Base64.encodeToString(data, Base64.NO_WRAP));
             sendEvent(REACTCONTEXT, "newData", params);
         }
     }
