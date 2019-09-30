@@ -152,7 +152,8 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
             if (usd == null) {
                 throw new Exception(String.format("No device opened for the id '%s'", deviceId));
             }
-            mListener = null;
+            // Do not clear the  event listener as it is created once on object creation
+            // mListener = null;
 
             if (mSerialIoManager != null) {
                 mSerialIoManager.setListener(null);
