@@ -25,7 +25,7 @@ export class UsbSerial {
   }
 
   async writeInDeviceAsync(id, data) {
-    await UsbSerialModule.writeInDeviceAsync(id, data);
+    return await UsbSerialModule.writeInDeviceAsync(id, data);
   }
 
   async closeDeviceAsync(id) {
