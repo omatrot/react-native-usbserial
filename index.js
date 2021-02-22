@@ -18,7 +18,7 @@ export class UsbSerial {
 
   async openDeviceAsync(deviceObject = {}) {
     return await UsbSerialModule.openDeviceAsync(deviceObject).then(
-      usbSerialDevNativeObject => {
+      (usbSerialDevNativeObject) => {
         return new UsbSerialDevice(UsbSerialModule, usbSerialDevNativeObject);
       }
     );
@@ -26,6 +26,10 @@ export class UsbSerial {
 
   async writeInDeviceAsync(id, data) {
     return await UsbSerialModule.writeInDeviceAsync(id, data);
+  }
+
+  async readFromDeviceAsync(id, size) {
+    return await UsbSerialModule.readFromDeviceAsync(id, size);
   }
 
   async closeDeviceAsync(id) {

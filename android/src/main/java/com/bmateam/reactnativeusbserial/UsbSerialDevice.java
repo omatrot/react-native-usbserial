@@ -1,5 +1,7 @@
 package com.bmateam.reactnativeusbserial;
 
+import android.util.Base64;
+
 import com.facebook.react.bridge.Promise;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 
@@ -34,6 +36,22 @@ public class UsbSerialDevice {
         }
     }
 
+    public void readAsync(int size, Promise promise) throws IOException {
+        if (port != null) {
+            final byte[] data = new byte[size];
+            int got = port.read(data, SERIAL_TIMEOUT * 4);
+            if (got != 20)
+            {
+                promise.reject(gotInvalidByteCountOnRead(size, got));
+            }
+            else {
+                promise.resolve(Base64.encodeToString(data, Base64.NO_WRAP));
+            }
+        } else {
+            promise.reject(getNoPortErrorMessage());
+        }
+    }
+
     public void closeAsync(Promise promise) {
         if (port != null) {
             try {
@@ -54,5 +72,9 @@ public class UsbSerialDevice {
 
     private Exception getNoPortErrorMessage() {
         return new Exception("No port present for the UsbSerialDevice instance");
+    }
+
+    private Exception gotInvalidByteCountOnRead(int expected, int got) {
+        return new Exception(String.format("Got an invalid byte number while reading data. Expected[%d] Got [%d]", expected, got));
     }
 }

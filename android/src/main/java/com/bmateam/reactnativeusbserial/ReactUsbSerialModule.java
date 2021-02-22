@@ -189,6 +189,22 @@ public class ReactUsbSerialModule extends ReactContextBaseJavaModule {
         }
     }
 
+    @ReactMethod
+    public void readFromDeviceAsync(String deviceId, int size, Promise p)
+    {
+        try {
+            UsbSerialDevice usd = usbSerialDriverDict.get(deviceId);
+
+            if (usd == null) {
+                throw new Exception(String.format("No device opened for the id '%s'", deviceId));
+            }
+
+            usd.readAsync(size, p);
+        } catch (Exception e) {
+            p.reject(e);
+        }
+    }
+
     private void sendEvent(ReactContext reactContext, String eventName, @NonNull WritableMap params) {
         reactContext.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter.class).emit(eventName, params);
     }
